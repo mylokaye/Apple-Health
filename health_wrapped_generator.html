@@ -545,8 +545,8 @@
                 <!-- Record Day -->
                 <div class="stat-card bento-item-7">
                     <div class="stat-label">Your Best Day</div>
-                    <div class="stat-value highlight-3" id="wrappedBestDay">0</div>
-                    <div class="stat-unit">steps in a single day</div>
+                    <div class="stat-value highlight-3" id="wrappedBestDayDate" style="font-size: clamp(24px, 4vw, 48px);">-</div>
+                    <div class="stat-unit" id="wrappedBestDaySteps" style="font-size: clamp(20px, 3vw, 32px); margin-top: 8px;">0 Steps</div>
                 </div>
             </div>
 
@@ -872,7 +872,26 @@
             const caloriesK = Math.round(stats.totalCalories / 1000) + 'K';
             const dailySteps = Object.values(stats.stepsByDay);
             const avgDailySteps = dailySteps.length > 0 ? Math.round(dailySteps.reduce((a, b) => a + b, 0) / dailySteps.length) : 0;
-            const maxDailySteps = dailySteps.length > 0 ? Math.round(Math.max(...dailySteps)) : 0;
+
+            // Find the best day (date and steps)
+            let maxDailySteps = 0;
+            let bestDayDate = null;
+            Object.entries(stats.stepsByDay).forEach(([date, steps]) => {
+                if (steps > maxDailySteps) {
+                    maxDailySteps = steps;
+                    bestDayDate = date;
+                }
+            });
+
+            // Format best day date as "DD/Month"
+            let formattedBestDay = '-';
+            if (bestDayDate) {
+                const d = new Date(bestDayDate);
+                const day = d.getDate();
+                const month = d.toLocaleString('default', { month: 'long' });
+                formattedBestDay = `${day}/${month}`;
+            }
+
             const flightsClimbed = Math.round(stats.totalFlights);
             const standingHours = Math.round(stats.totalStandTime / 60);
 
@@ -903,7 +922,8 @@
             document.getElementById('wrappedStepsMessage').textContent = avgDailySteps > 10000 ? 'Above recommended 10K!' : 'Keep it up!';
             document.getElementById('wrappedExercise').textContent = exerciseHours;
             document.getElementById('wrappedCalories').textContent = caloriesK;
-            document.getElementById('wrappedBestDay').textContent = maxDailySteps.toLocaleString();
+            document.getElementById('wrappedBestDayDate').textContent = formattedBestDay;
+            document.getElementById('wrappedBestDaySteps').textContent = `${Math.round(maxDailySteps).toLocaleString()} Steps`;
             document.getElementById('wrappedFlights').textContent = flightsClimbed.toLocaleString();
             document.getElementById('burjKhalifaComparison').textContent = burjComparison;
             document.getElementById('wrappedStanding').textContent = standingHours.toLocaleString();
