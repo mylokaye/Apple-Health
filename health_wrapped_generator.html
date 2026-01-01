@@ -206,7 +206,6 @@
             .bento-item-3 { grid-column: span 2; grid-row: span 1; }
             .bento-item-4 { grid-column: span 1; grid-row: span 2; }
             .bento-item-5 { grid-column: span 1; grid-row: span 2; }
-            .bento-item-6 { grid-column: span 2; grid-row: span 2; }
             .bento-item-7 { grid-column: span 2; grid-row: span 1; }
             .bento-item-8 { grid-column: span 1; grid-row: span 2; }
             .bento-item-9 { grid-column: span 1; grid-row: span 2; }
@@ -530,20 +529,6 @@
                     <div class="stat-unit">Days stood up</div>
                 </div>
 
-                <!-- Exercise & Calories -->
-                <div class="stat-card double-stat bento-item-6">
-                    <div>
-                        <div class="stat-label">Exercise</div>
-                        <div class="stat-value highlight-1" id="wrappedExercise">0</div>
-                        <div class="stat-unit">hours</div>
-                    </div>
-                    <div>
-                        <div class="stat-label">Calories</div>
-                        <div class="stat-value highlight-2" id="wrappedCalories">0</div>
-                        <div class="stat-unit">burned</div>
-                    </div>
-                </div>
-
                 <!-- Record Day -->
                 <div class="stat-card bento-item-7">
                     <div class="stat-label">Your Best Day</div>
@@ -609,8 +594,6 @@
                 stepsByDay: {},
                 totalDistance: 0,
                 heartRates: [],
-                totalExercise: 0,
-                totalCalories: 0,
                 totalFlights: 0,
                 totalStandTime: 0,
                 sleepInBed: 0,
@@ -680,8 +663,6 @@
                 stepsByDay: {},
                 totalDistance: 0,
                 heartRates: [],
-                totalExercise: 0,
-                totalCalories: 0,
                 totalFlights: 0,
                 totalStandTime: 0,
                 sleepInBed: 0,
@@ -734,19 +715,19 @@
             const endDate = getAttr('endDate');
             const creationDate = getAttr('creationDate');
 
-            // Filter: must be 2025 and have a unit
-            if (!startDate || !startDate.startsWith('2025') || !unit) {
+            // Clean type name
+            const cleanType = type ? type.replace('HKQuantityTypeIdentifier', '').replace('HKCategoryTypeIdentifier', '') : '';
+
+            // Filter: must be 2025 and (have a unit OR be SleepAnalysis)
+            if (!startDate || !startDate.startsWith('2025') || (!unit && cleanType !== 'SleepAnalysis')) {
                 return;
             }
 
             state.stats.recordsFound++;
 
-            // Clean type name
-            const cleanType = type.replace('HKQuantityTypeIdentifier', '').replace('HKCategoryTypeIdentifier', '');
-
             // Add to CSV data
             state.csvData.push({
-                unit,
+                unit: unit || '',
                 creationDate,
                 value,
                 startDate,
@@ -756,38 +737,47 @@
 
             // Calculate statistics
             const numValue = parseFloat(value);
-            if (isNaN(numValue)) return;
 
             switch (cleanType) {
                 case 'StepCount':
-                    state.stats.totalSteps += numValue;
-                    const day = startDate.split(' ')[0];
-                    state.stats.stepsByDay[day] = (state.stats.stepsByDay[day] || 0) + numValue;
+                    if (!isNaN(numValue)) {
+                        state.stats.totalSteps += numValue;
+                        const day = startDate.split(' ')[0];
+                        state.stats.stepsByDay[day] = (state.stats.stepsByDay[day] || 0) + numValue;
+                    }
                     break;
                 case 'DistanceWalkingRunning':
-                    state.stats.totalDistance += numValue;
+                    if (!isNaN(numValue)) {
+                        state.stats.totalDistance += numValue;
+                    }
                     break;
                 case 'HeartRate':
-                    state.stats.heartRates.push(numValue);
-                    break;
-                case 'AppleExerciseTime':
-                    state.stats.totalExercise += numValue;
-                    break;
-                case 'ActiveEnergyBurned':
-                    state.stats.totalCalories += numValue;
+                    if (!isNaN(numValue)) {
+                        state.stats.heartRates.push(numValue);
+                    }
                     break;
                 case 'FlightsClimbed':
-                    state.stats.totalFlights += numValue;
+                    if (!isNaN(numValue)) {
+                        state.stats.totalFlights += numValue;
+                    }
                     break;
                 case 'AppleStandTime':
-                    state.stats.totalStandTime += numValue;
+                    if (!isNaN(numValue)) {
+                        state.stats.totalStandTime += numValue;
+                    }
                     break;
                 case 'SleepAnalysis':
-                    // Note: Sleep data might not have units, so may be filtered out
-                    if (value.includes('Asleep')) {
-                        state.stats.sleepAsleep += numValue;
+                    // Calculate duration from startDate to endDate (in minutes)
+                    if (startDate && endDate) {
+                        const start = new Date(startDate);
+                        const end = new Date(endDate);
+                        const durationMinutes = (end - start) / (1000 * 60);
+
+                        if (value && value.includes('Asleep')) {
+                            state.stats.sleepAsleep += durationMinutes;
+                        }
+                        state.stats.sleepInBed += durationMinutes;
                     }
-                    state.stats.sleepInBed += numValue;
                     break;
             }
         }
@@ -877,8 +867,6 @@
             const totalStepsM = (stats.totalSteps / 1000000).toFixed(2);
             const totalMiles = Math.round(stats.totalDistance);
             const totalKm = Math.round(stats.totalDistance * 1.60934);
-            const exerciseHours = Math.round(stats.totalExercise / 60);
-            const caloriesK = Math.round(stats.totalCalories / 1000) + 'K';
             const dailySteps = Object.values(stats.stepsByDay);
             const avgDailySteps = dailySteps.length > 0 ? Math.round(dailySteps.reduce((a, b) => a + b, 0) / dailySteps.length) : 0;
 
@@ -930,8 +918,6 @@
             document.getElementById('moonComparison').textContent = moonComparison;
             document.getElementById('wrappedAvgSteps').textContent = avgDailySteps.toLocaleString();
             document.getElementById('wrappedStepsMessage').textContent = avgDailySteps > 10000 ? 'Above recommended 10K!' : 'Keep it up!';
-            document.getElementById('wrappedExercise').textContent = exerciseHours;
-            document.getElementById('wrappedCalories').textContent = caloriesK;
             document.getElementById('wrappedBestDayDate').textContent = formattedBestDay;
             document.getElementById('wrappedBestDaySteps').textContent = `${Math.round(maxDailySteps).toLocaleString()} Steps`;
             document.getElementById('wrappedFlights').textContent = flightsClimbed.toLocaleString();
